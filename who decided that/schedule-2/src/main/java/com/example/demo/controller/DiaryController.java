@@ -17,6 +17,7 @@ import com.example.demo.service.HomeworkService;
 import com.example.demo.service.ScheduleService;
 import com.example.demo.service.UserService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/diary")
 @CrossOrigin(origins = "*")
@@ -205,6 +207,7 @@ public class DiaryController {
             @PathVariable String teacherId,
             @RequestParam String groupId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        log.debug("getJournalByDate(teacherId={}, groupId={}, date={})", teacherId, groupId, date);
         Map<String, Object> journal = new HashMap<>();
         journal.put("date", date.toString());
         journal.put("dayOfWeek", date.getDayOfWeek().name());
@@ -272,6 +275,7 @@ public class DiaryController {
             lessons.add(lessonEntry);
         }
         journal.put("lessons", lessons);
+        log.info("getJournalByDate - groupId={}, date={}, lessons={}", groupId, date, lessons.size());
         return ResponseEntity.ok(journal);
     }
     
@@ -444,18 +448,22 @@ public class DiaryController {
     @PostMapping("/grades")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
     public ResponseEntity<?> createGrade(@Valid @RequestBody GradeDTO gradeDTO) {
+        log.debug("createGrade(studentId={}, subject={}, value={})", gradeDTO.getStudentId(), gradeDTO.getSubject(), gradeDTO.getGradeValue());
         if ("TEACHER".equals(currentRole())) {
             String teacherSubject = currentUserSubject();
             if (teacherSubject != null && !teacherSubject.isBlank()
                     && !teacherSubject.equalsIgnoreCase(gradeDTO.getSubject())) {
+                log.warn("createGrade - teacher subject mismatch: allowed={}, requested={}", teacherSubject, gradeDTO.getSubject());
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Вы можете ставить оценки только по предмету: " + teacherSubject);
             }
         }
         try {
             GradeDTO createdGrade = gradeService.createGrade(gradeDTO);
+            log.info("createGrade - grade created: id={}, studentId={}, subject={}", createdGrade.getId(), createdGrade.getStudentId(), createdGrade.getSubject());
             return ResponseEntity.status(HttpStatus.CREATED).body(createdGrade);
         } catch (Exception e) {
+            log.error("createGrade failed: studentId={}, subject={}", gradeDTO.getStudentId(), gradeDTO.getSubject(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -475,9 +483,15 @@ public class DiaryController {
         }
         try {
             Optional<GradeDTO> updatedGrade = gradeService.updateGrade(id, gradeDTO);
+            if (updatedGrade.isPresent()) {
+                log.info("updateGrade - grade updated: id={}", id);
+            } else {
+                log.warn("updateGrade - grade not found: id={}", id);
+            }
             return updatedGrade.map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
+            log.error("updateGrade failed: id={}", id, e);
             return ResponseEntity.badRequest().build();
         }
     }

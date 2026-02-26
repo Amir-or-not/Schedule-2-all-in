@@ -62,16 +62,17 @@ public class UserService {
     }
     
     public UserDTO createUser(UserDTO userDTO) {
-        // Check if user with same ID or email already exists
+        log.debug("createUser(userId={}, email={})", userDTO.getUserId(), userDTO.getEmail());
         if (userRepository.existsById(userDTO.getUserId())) {
+            log.warn("createUser failed: userId already exists: {}", userDTO.getUserId());
             throw new IllegalArgumentException("User with ID " + userDTO.getUserId() + " already exists");
         }
         
         if (userRepository.existsByEmail(userDTO.getEmail())) {
+            log.warn("createUser failed: email already exists: {}", userDTO.getEmail());
             throw new IllegalArgumentException("User with email " + userDTO.getEmail() + " already exists");
         }
         
-        // Encode password
         if (userDTO.getPassword() != null) {
             userDTO.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         }
@@ -144,18 +145,21 @@ public class UserService {
      * Обновляются только переданные непустые поля.
      */
     public Optional<UserDTO> updateUserPartial(String userId, String fullName, String email, String groupId, String role, String subject) {
+        log.debug("updateUserPartial(userId={}, fullName={}, email={}, role={})", userId, fullName != null, email != null, role);
         return userRepository.findById(userId).map(existingUser -> {
             if (fullName != null && !fullName.isBlank()) {
                 existingUser.setFullName(fullName.trim());
             }
             if (email != null && !email.isBlank()) {
                 if (userRepository.existsByEmail(email) && !email.equals(existingUser.getEmail())) {
+                    log.warn("updateUserPartial failed: email already exists: {}", email);
                     throw new IllegalArgumentException("User with email " + email + " already exists");
                 }
                 existingUser.setEmail(email.trim());
             }
             if (groupId != null) {
                 if (!groupId.isBlank() && !groupRepository.existsById(groupId)) {
+                    log.warn("updateUserPartial failed: group not found: {}", groupId);
                     throw new IllegalArgumentException("Group with ID " + groupId + " does not exist");
                 }
                 existingUser.setGroupId(groupId.isBlank() ? null : groupId.trim());
@@ -177,6 +181,23 @@ public class UserService {
             User updated = userRepository.save(existingUser);
             log.info("[DATA] User updated (partial): userId={}, role={}, subject={}", userId, role, subject);
             return convertToDTO(updated);
+        });
+    }
+
+    public boolean changePassword(String userId, String oldPassword, String newPassword) {
+        log.debug("changePassword(userId={})", userId);
+        return userRepository.findById(userId).map(user -> {
+            if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+                log.warn("changePassword failed: wrong current password for userId={}", userId);
+                return false;
+            }
+            user.setPassword(passwordEncoder.encode(newPassword));
+            userRepository.save(user);
+            log.info("[DATA] Password changed: userId={}", userId);
+            return true;
+        }).orElseGet(() -> {
+            log.warn("changePassword failed: user not found, userId={}", userId);
+            return false;
         });
     }
 

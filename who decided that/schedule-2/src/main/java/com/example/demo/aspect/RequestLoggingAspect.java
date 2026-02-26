@@ -46,17 +46,17 @@ public class RequestLoggingAspect {
         }
 
         String targetMethod = joinPoint.getSignature().getDeclaringType().getSimpleName() + "#" + joinPoint.getSignature().getName();
-        log.info("[USER_ACTION] user={} | {} {} | handler={} | start", user, method, path, targetMethod);
+        log.debug("[REQUEST] user={} | {} {} | handler={} | start", user, method, path, targetMethod);
 
         Object result;
         try {
             result = joinPoint.proceed();
             long duration = System.currentTimeMillis() - start;
-            log.info("[USER_ACTION] user={} | {} {} | handler={} | success | {} ms", user, method, path, targetMethod, duration);
+            log.info("[REQUEST] user={} | {} {} | handler={} | 200 | {} ms", user, method, path, targetMethod, duration);
             return result;
         } catch (Throwable t) {
             long duration = System.currentTimeMillis() - start;
-            log.warn("[USER_ACTION] user={} | {} {} | handler={} | error: {} | {} ms", user, method, path, targetMethod, t.getMessage(), duration);
+            log.error("[REQUEST] user={} | {} {} | handler={} | error: {} | {} ms", user, method, path, targetMethod, t.getMessage(), duration, t);
             throw t;
         }
     }

@@ -27,17 +27,22 @@ public class GroupService {
     // ModelMapper is now instantiated directly where needed
 
     public List<GroupDTO> getAllGroups() {
-        return groupRepository.findAll().stream()
+        log.debug("getAllGroups()");
+        List<GroupDTO> list = groupRepository.findAll().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+        log.info("getAllGroups() - returned {} groups", list.size());
+        return list;
     }
     
     public Optional<GroupDTO> getGroupById(String groupId) {
+        log.debug("getGroupById(groupId={})", groupId);
         return groupRepository.findById(groupId)
                 .map(this::convertToDTO);
     }
     
     public List<GroupDTO> getGroupsByScheduleId(String scheduleId) {
+        log.debug("getGroupsByScheduleId(scheduleId={})", scheduleId);
         return groupRepository.findByScheduleId(scheduleId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -45,67 +50,66 @@ public class GroupService {
     
     @Transactional
     public GroupDTO createGroup(GroupDTO groupDTO) {
-        log.info("Creating group: {}", groupDTO);
+        log.info("createGroup: groupId={}, groupName={}", groupDTO.getGroupId(), groupDTO.getGroupName());
         
-        // Check if group with the same ID already exists
         if (groupDTO.getGroupId() != null && groupRepository.existsById(groupDTO.getGroupId())) {
             String error = "Group with ID " + groupDTO.getGroupId() + " already exists";
-            log.error(error);
+            log.error("createGroup failed: {}", error);
             throw new IllegalArgumentException(error);
         }
         
-        // Set default schedule ID if not provided
         if (groupDTO.getScheduleId() == null || groupDTO.getScheduleId().trim().isEmpty()) {
-            log.info("Setting default schedule ID for group");
+            log.debug("createGroup: setting default scheduleId");
             groupDTO.setScheduleId("default_schedule");
         }
         
-        // Set default group name if not provided
         if (groupDTO.getGroupName() == null || groupDTO.getGroupName().trim().isEmpty()) {
-            log.info("Setting default group name");
+            log.debug("createGroup: setting default groupName");
             groupDTO.setGroupName("Unnamed Group");
         }
         
         try {
-            // Create new group
             Group group = convertToEntity(groupDTO);
             group = groupRepository.save(group);
-            log.info("Successfully created group with ID: {}", group.getGroupId());
-            
+            log.info("createGroup success: groupId={}", group.getGroupId());
             return convertToDTO(group);
         } catch (Exception e) {
+            log.error("createGroup failed: groupId={}", groupDTO.getGroupId(), e);
             throw new RuntimeException("Failed to create group: " + e.getMessage(), e);
         }
     }
     
     public Optional<GroupDTO> updateGroup(String groupId, GroupDTO groupDTO) {
+        log.debug("updateGroup(groupId={})", groupId);
         return groupRepository.findById(groupId)
                 .map(existingGroup -> {
-                    // Validate that the schedule exists if it's being changed
-                    // Skip schedule validation since we removed scheduleRepository
-                    if (!groupDTO.getScheduleId().equals(existingGroup.getScheduleId())) {
-                        log.warn("Schedule ID validation skipped - scheduleRepository not available");
+                    if (groupDTO.getScheduleId() != null && !groupDTO.getScheduleId().equals(existingGroup.getScheduleId())) {
+                        log.debug("updateGroup: scheduleId changed to {}", groupDTO.getScheduleId());
                     }
-                    
                     existingGroup.setScheduleId(groupDTO.getScheduleId());
                     existingGroup.setGroupName(groupDTO.getGroupName());
                     existingGroup.setDescription(groupDTO.getDescription());
                     existingGroup.setData(groupDTO.getData());
                     Group updatedGroup = groupRepository.save(existingGroup);
-                    log.info("[DATA] Group updated: groupId={}", groupId);
+                    log.info("updateGroup success: groupId={}", groupId);
                     return convertToDTO(updatedGroup);
                 });
     }
     
     public boolean deleteGroup(String groupId) {
+        log.debug("deleteGroup(groupId={})", groupId);
         return groupRepository.findById(groupId).map(group -> {
             groupRepository.deleteById(groupId);
-            log.info("[DATA] Group deleted: groupId={}", groupId);
+            log.info("deleteGroup success: groupId={}", groupId);
             return true;
-        }).orElse(false);
+        }).orElseGet(() -> {
+            log.warn("deleteGroup: group not found, groupId={}", groupId);
+            return false;
+        });
     }
     
     public List<GroupDTO> searchGroupsByName(String name) {
+        log.debug("searchGroupsByName(name={})", name);
         return groupRepository.findByGroupNameContainingIgnoreCase(name).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
