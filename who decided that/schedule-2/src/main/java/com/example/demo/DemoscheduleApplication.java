@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableJpaRepositories
 @EnableTransactionManagement
 public class DemoscheduleApplication {
-
     public static void main(String[] args) {
         SpringApplication.run(DemoscheduleApplication.class, args);
     }

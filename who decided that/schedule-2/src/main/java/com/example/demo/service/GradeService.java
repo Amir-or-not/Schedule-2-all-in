@@ -5,16 +5,20 @@ import com.example.demo.dto.StudentGradeStatsDTO;
 import com.example.demo.entity.Grade;
 import com.example.demo.repository.GradeRepository;
 import com.example.demo.repository.ScheduleRepository;
-import com.example.demo.service.UserService;
+// import com.example.demo.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 public class GradeService {
@@ -47,6 +51,15 @@ public class GradeService {
     
     public List<GradeDTO> getGradesByGroupId(String groupId) {
         return gradeRepository.findByGroupId(groupId).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /** Оценки группы за указанную дату (по lessonDate). */
+    public List<GradeDTO> getGradesByGroupIdAndDate(String groupId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        return gradeRepository.findByGroupIdAndLessonDateBetween(groupId, start, end).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -85,6 +98,7 @@ public class GradeService {
         }
         
         Grade savedGrade = gradeRepository.save(grade);
+        log.info("[DATA] Grade created: id={}, studentId={}, subject={}", savedGrade.getId(), savedGrade.getStudentId(), savedGrade.getSubject());
         return convertToDTO(savedGrade);
     }
     
@@ -101,6 +115,7 @@ public class GradeService {
                     existingGrade.setGroupId(gradeDTO.getGroupId());
                     existingGrade.setScheduleId(gradeDTO.getScheduleId());
                     Grade updatedGrade = gradeRepository.save(existingGrade);
+                    log.info("[DATA] Grade updated: id={}", id);
                     return convertToDTO(updatedGrade);
                 });
     }
@@ -108,6 +123,7 @@ public class GradeService {
     public boolean deleteGrade(Long id) {
         if (gradeRepository.existsById(id)) {
             gradeRepository.deleteById(id);
+            log.info("[DATA] Grade deleted: id={}", id);
             return true;
         }
         return false;

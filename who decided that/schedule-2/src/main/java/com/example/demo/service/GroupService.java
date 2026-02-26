@@ -92,6 +92,7 @@ public class GroupService {
                     existingGroup.setDescription(groupDTO.getDescription());
                     existingGroup.setData(groupDTO.getData());
                     Group updatedGroup = groupRepository.save(existingGroup);
+                    log.info("[DATA] Group updated: groupId={}", groupId);
                     return convertToDTO(updatedGroup);
                 });
     }
@@ -99,6 +100,7 @@ public class GroupService {
     public boolean deleteGroup(String groupId) {
         return groupRepository.findById(groupId).map(group -> {
             groupRepository.deleteById(groupId);
+            log.info("[DATA] Group deleted: groupId={}", groupId);
             return true;
         }).orElse(false);
     }

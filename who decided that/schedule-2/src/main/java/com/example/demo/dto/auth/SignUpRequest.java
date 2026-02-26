@@ -25,7 +25,7 @@ public class SignUpRequest {
     @NotBlank(message = "Full name is required")
     private String fullName;
 
-    @NotBlank(message = "Group ID is required")
+    /** Группа пользователя. Если не указана — при регистрации будет назначена группа по умолчанию (user-group). Список групп: GET /api/auth/groups */
     private String groupId;
 
     // Role is optional - can be a single string or list

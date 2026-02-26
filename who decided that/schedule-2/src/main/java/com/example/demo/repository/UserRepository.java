@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<User, String> {
     
     List<User> findByRole(String role);
     
+    Optional<User> findByFullName(String fullName);
+    
     List<User> findByFullNameContainingIgnoreCase(String fullName);
     
     @Query("SELECT u FROM User u WHERE u.email = :email")

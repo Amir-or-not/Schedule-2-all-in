@@ -1,10 +1,15 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.UpdateUserRequest;
 import com.example.demo.dto.UserDTO;
+import com.example.demo.security.services.UserDetailsImpl;
 import com.example.demo.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,14 +25,33 @@ public class UserController {
     public UserController(UserService userService) {
         this.userService = userService;
     }
+
+    /** Профиль текущего пользователя (доступен всем авторизованным). */
+    @GetMapping("/me")
+    public ResponseEntity<UserDTO> getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UserDetailsImpl ud = (UserDetailsImpl) auth.getPrincipal();
+        Optional<UserDTO> user = userService.getUserById(ud.getId());
+        if (user.isEmpty()) {
+            user = userService.getUserByEmail(ud.getEmail());
+        }
+        return user.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
     
+    /** Список всех пользователей — только ADMIN */
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserDTO>> getAllUsers() {
         List<UserDTO> users = userService.getAllUsers();
         return ResponseEntity.ok(users);
     }
     
     @GetMapping("/{userId}")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
     public ResponseEntity<UserDTO> getUserById(@PathVariable("userId") String userId) {
         Optional<UserDTO> user = userService.getUserById(userId);
         return user.map(ResponseEntity::ok)
@@ -35,25 +59,31 @@ public class UserController {
     }
     
     @GetMapping("/email/{email}")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
     public ResponseEntity<UserDTO> getUserByEmail(@PathVariable("email") String email) {
         Optional<UserDTO> user = userService.getUserByEmail(email);
         return user.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    /** Ученики группы — только учитель/админ. */
     @GetMapping("/group/{groupId}")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
     public ResponseEntity<List<UserDTO>> getUsersByGroupId(@PathVariable("groupId") String groupId) {
         List<UserDTO> users = userService.getUsersByGroupId(groupId);
         return ResponseEntity.ok(users);
     }
     
     @GetMapping("/role/{role}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserDTO>> getUsersByRole(@PathVariable("role") String role) {
         List<UserDTO> users = userService.getUsersByRole(role);
         return ResponseEntity.ok(users);
     }
     
+    /** Создание пользователя — только ADMIN */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createUser(@Valid @RequestBody UserDTO userDTO) {
         try {
             if (userDTO.getUserId() == null || userDTO.getUserId().trim().isEmpty()) {
@@ -73,7 +103,9 @@ public class UserController {
         }
     }
     
+    /** Изменение пользователя (роль, группа и т.д.) — только ADMIN */
     @PutMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateUser(
             @PathVariable("userId") String userId,
             @Valid @RequestBody UserDTO userDTO) {
@@ -95,7 +127,31 @@ public class UserController {
         }
     }
     
+    /** Частичное обновление (роль, группа, имя, email) без пароля — только ADMIN */
+    @PatchMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> patchUser(
+            @PathVariable("userId") String userId,
+            @RequestBody UpdateUserRequest request) {
+        try {
+            Optional<UserDTO> updated = userService.updateUserPartial(
+                    userId,
+                    request.getFullName(),
+                    request.getEmail(),
+                    request.getGroupId(),
+                    request.getRole(),
+                    request.getSubject()
+            );
+            return updated.map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /** Удаление пользователя — только ADMIN */
     @DeleteMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable("userId") String userId) {
         try {
             boolean deleted = userService.deleteUser(userId);
@@ -106,6 +162,7 @@ public class UserController {
     }
     
     @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
     public ResponseEntity<List<UserDTO>> searchUsersByName(@RequestParam("name") String name) {
         List<UserDTO> users = userService.searchUsersByName(name);
         return ResponseEntity.ok(users);

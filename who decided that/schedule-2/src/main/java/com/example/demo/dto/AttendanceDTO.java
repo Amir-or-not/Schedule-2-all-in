@@ -24,7 +24,7 @@ public class AttendanceDTO {
     private LocalDate attendanceDate;
     
     @NotBlank(message = "Status is required")
-    private String status; // "present", "absent", "late", "excused"
+    private String status; // "present", "absent", "sick"
     
     private String teacherId;
     

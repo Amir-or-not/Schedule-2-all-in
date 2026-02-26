@@ -50,7 +50,7 @@ public class NewsController {
 
     @PostMapping
     @Operation(summary = "Create a new news article")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<NewsDTO> createNews(
             @Parameter(description = "News article details")
             @Valid @RequestBody NewsDTO newsDTO) {
@@ -62,7 +62,7 @@ public class NewsController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update an existing news article")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<NewsDTO> updateNews(
             @Parameter(description = "ID of the news article to update")
             @PathVariable Long id,
@@ -73,7 +73,7 @@ public class NewsController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a news article")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteNews(
             @Parameter(description = "ID of the news article to delete")
             @PathVariable Long id) {

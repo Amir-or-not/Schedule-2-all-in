@@ -23,13 +23,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         logger.info("Loading user by username/email: {}", username);
         
-        // Try to find user by email first (most common case)
         User user = userRepository.findByEmail(username)
-            .orElseGet(() -> {
-                // If not found by email, try to find by userId
-                logger.info("User not found by email, trying userId: {}", username);
-                return userRepository.findByUserId(username).orElse(null);
-            });
+            .orElseGet(() -> userRepository.findByUserId(username)
+            .orElseGet(() -> userRepository.findByFullName(username)
+            .orElse(null)));
         
         if (user == null) {
             logger.error("User not found: {}", username);

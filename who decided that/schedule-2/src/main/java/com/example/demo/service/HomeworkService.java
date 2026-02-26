@@ -6,12 +6,14 @@ import com.example.demo.repository.HomeworkRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 public class HomeworkService {
@@ -54,6 +56,7 @@ public class HomeworkService {
             homework.setAssignedDate(LocalDateTime.now());
         }
         Homework savedHomework = homeworkRepository.save(homework);
+        log.info("[DATA] Homework created: id={}, title={}, groupId={}", savedHomework.getId(), savedHomework.getTitle(), savedHomework.getGroupId());
         return convertToDTO(savedHomework);
     }
     
@@ -70,6 +73,7 @@ public class HomeworkService {
                     existingHomework.setStudentId(homeworkDTO.getStudentId());
                     existingHomework.setAttachmentUrl(homeworkDTO.getAttachmentUrl());
                     Homework updatedHomework = homeworkRepository.save(existingHomework);
+                    log.info("[DATA] Homework updated: id={}", id);
                     return convertToDTO(updatedHomework);
                 });
     }
@@ -77,6 +81,7 @@ public class HomeworkService {
     public boolean deleteHomework(Long id) {
         if (homeworkRepository.existsById(id)) {
             homeworkRepository.deleteById(id);
+            log.info("[DATA] Homework deleted: id={}", id);
             return true;
         }
         return false;

@@ -27,7 +27,7 @@ public class Attendance {
     private LocalDate attendanceDate;
     
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // "present", "absent", "late", "excused"
+    private String status; // "present", "absent", "sick"
     
     @Column(name = "teacher_id", length = 50)
     private String teacherId;

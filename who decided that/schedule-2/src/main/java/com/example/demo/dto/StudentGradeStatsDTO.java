@@ -3,16 +3,16 @@ package com.example.demo.dto;
 import lombok.Data;
 
 import java.util.List;
-import java.util.Map;
+// import java.util.Map;
 
 @Data
 public class StudentGradeStatsDTO {
     
     private String studentId;
     private String studentName;
-    private Double overallAverage; // Средний балл по всем предметам
-    private Integer totalGrades; // Общее количество оценок
-    private List<SubjectGradeStatsDTO> subjectStats; // Статистика по каждому предмету
+    private Double overallAverage; 
+    private Integer totalGrades; 
+    private List<SubjectGradeStatsDTO> subjectStats; 
     
     @Data
     public static class SubjectGradeStatsDTO {

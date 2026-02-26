@@ -6,12 +6,14 @@ import com.example.demo.repository.AttendanceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 public class AttendanceService {
@@ -47,10 +49,33 @@ public class AttendanceService {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+
+    public List<AttendanceDTO> getAttendanceByGroupIdAndDate(String groupId, LocalDate date) {
+        return attendanceRepository.findByGroupIdAndDate(groupId, date).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public AttendanceDTO upsertAttendance(AttendanceDTO dto) {
+        List<Attendance> existing = attendanceRepository.findByGroupIdAndDate(
+                dto.getGroupId(), dto.getAttendanceDate());
+        Attendance found = existing.stream()
+                .filter(a -> a.getStudentId().equals(dto.getStudentId())
+                        && a.getSubject().equals(dto.getSubject()))
+                .findFirst().orElse(null);
+        if (found != null) {
+            found.setStatus(dto.getStatus());
+            found.setTeacherId(dto.getTeacherId());
+            found.setComment(dto.getComment());
+            return convertToDTO(attendanceRepository.save(found));
+        }
+        return createAttendance(dto);
+    }
     
     public AttendanceDTO createAttendance(AttendanceDTO attendanceDTO) {
         Attendance attendance = convertToEntity(attendanceDTO);
         Attendance savedAttendance = attendanceRepository.save(attendance);
+        log.info("[DATA] Attendance created: id={}, studentId={}, date={}", savedAttendance.getId(), savedAttendance.getStudentId(), savedAttendance.getAttendanceDate());
         return convertToDTO(savedAttendance);
     }
     
@@ -65,6 +90,7 @@ public class AttendanceService {
                     existingAttendance.setGroupId(attendanceDTO.getGroupId());
                     existingAttendance.setComment(attendanceDTO.getComment());
                     Attendance updatedAttendance = attendanceRepository.save(existingAttendance);
+                    log.info("[DATA] Attendance updated: id={}", id);
                     return convertToDTO(updatedAttendance);
                 });
     }
@@ -72,6 +98,7 @@ public class AttendanceService {
     public boolean deleteAttendance(Long id) {
         if (attendanceRepository.existsById(id)) {
             attendanceRepository.deleteById(id);
+            log.info("[DATA] Attendance deleted: id={}", id);
             return true;
         }
         return false;

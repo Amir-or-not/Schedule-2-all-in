@@ -6,66 +6,91 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class UserDetailsImpl implements UserDetails {
     private static final long serialVersionUID = 1L;
 
     private String id;
-    private String username;
+    private String fullName;
     private String email;
     @JsonIgnore
     private String password;
     private String groupId;
+    private String subject;
     private Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(String id, String username, String email, String password, 
-                          String groupId, Collection<? extends GrantedAuthority> authorities) {
+    public UserDetailsImpl(String id, String fullName, String email, String password, 
+                          String groupId, String subject, Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
-        this.username = username;
+        this.fullName = fullName;
         this.email = email;
         this.password = password;
         this.groupId = groupId;
+        this.subject = subject;
         this.authorities = authorities;
     }
 
     public static UserDetailsImpl build(User user) {
-        // Get the role from user or default to "USER"
         String role = (user.getRole() != null && !user.getRole().trim().isEmpty()) 
-            ? user.getRole() 
+            ? user.getRole().trim().toUpperCase()
             : "USER";
+        if (role.startsWith("ROLE_")) role = role.substring(5);
         
-        // Ensure the role has the ROLE_ prefix
-        String normalizedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-        
-        // Log user details for debugging
-        System.out.println("Building UserDetails for user: " + user.getEmail());
-        System.out.println("User role from DB: " + user.getRole());
-        System.out.println("Normalized role: " + normalizedRole);
-        
-        // Create authorities - for admin, add all permissions
-        Collection<SimpleGrantedAuthority> authorities;
-        if ("ROLE_ADMIN".equals(normalizedRole)) {
-            // Admin has all permissions
-            authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"));
-            System.out.println("Admin user detected, granting all permissions");
-        } else {
-            // Regular user with their specific role
-            authorities = Collections.singletonList(new SimpleGrantedAuthority(normalizedRole));
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+
+        if (role.contains("TEACHER") && !"TEACHER".equals(role)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_TEACHER"));
         }
-            
-        System.out.println("Authorities: " + authorities);
+        if ("ADMIN".equals(role)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_TEACHER"));
+            authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+        }
         
+        String subject = user.getSubject();
+        if ((subject == null || subject.isBlank()) && role.contains("TEACHER") && !"TEACHER".equals(role)) {
+            subject = resolveSubjectFromRole(role);
+        }
+
         return new UserDetailsImpl(
                 user.getUserId(),
                 user.getFullName(),
                 user.getEmail(),
                 user.getPassword(),
                 user.getGroupId(),
+                subject,
                 authorities
         );
+    }
+
+    private static final Map<String, String> ROLE_SUBJECT_MAP = new LinkedHashMap<>();
+    static {
+        ROLE_SUBJECT_MAP.put("MATH", "Математика");
+        ROLE_SUBJECT_MAP.put("PHYSICS", "Физика");
+        ROLE_SUBJECT_MAP.put("HISTORY", "История");
+        ROLE_SUBJECT_MAP.put("RUSSIAN", "Русский язык");
+        ROLE_SUBJECT_MAP.put("INFORM", "Информатика");
+        ROLE_SUBJECT_MAP.put("CS", "Информатика");
+        ROLE_SUBJECT_MAP.put("ENGLISH", "Английский язык");
+        ROLE_SUBJECT_MAP.put("BIO", "Биология");
+        ROLE_SUBJECT_MAP.put("CHEM", "Химия");
+        ROLE_SUBJECT_MAP.put("GEO", "География");
+        ROLE_SUBJECT_MAP.put("LIT", "Литература");
+    }
+
+    public static String resolveSubjectFromRole(String role) {
+        if (role == null) return null;
+        String upper = role.toUpperCase();
+        for (Map.Entry<String, String> e : ROLE_SUBJECT_MAP.entrySet()) {
+            if (upper.contains(e.getKey())) return e.getValue();
+        }
+        return null;
     }
 
     @Override
@@ -85,6 +110,14 @@ public class UserDetailsImpl implements UserDetails {
         return groupId;
     }
 
+    public String getSubject() {
+        return subject;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
     @Override
     public String getPassword() {
         return password;
@@ -92,7 +125,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public String getUsername() {
-        return username;
+        return email;
     }
 
     @Override

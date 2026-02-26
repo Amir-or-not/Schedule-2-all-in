@@ -27,7 +27,10 @@ public class User {
     private String groupId;
     
     @Column(name = "role", length = 20, nullable = false)
-    private String role = "USER";  // Default role is USER
+    private String role = "USER";
+
+    @Column(name = "subject", length = 100)
+    private String subject;
     
     @CreationTimestamp
     @Column(name = "created_at")
@@ -128,6 +131,14 @@ public class User {
         this.avatar = avatar;
     }
     
+    public String getSubject() {
+        return subject;
+    }
+
+    public void setSubject(String subject) {
+        this.subject = subject;
+    }
+
     public Group getGroup() {
         return group;
     }

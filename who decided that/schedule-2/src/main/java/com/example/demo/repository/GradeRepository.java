@@ -49,5 +49,12 @@ public interface GradeRepository extends JpaRepository<Grade, Long> {
     @Query("SELECT g FROM Grade g WHERE g.scheduleId = :scheduleId AND g.subject = :subject")
     List<Grade> findByScheduleIdAndSubject(@Param("scheduleId") String scheduleId, 
                                            @Param("subject") String subject);
+
+    /** Оценки группы за указанную дату (по полю lesson_date). */
+    @Query("SELECT g FROM Grade g WHERE g.groupId = :groupId AND g.lessonDate >= :start AND g.lessonDate < :end ORDER BY g.subject, g.lessonDate")
+    List<Grade> findByGroupIdAndLessonDateBetween(
+            @Param("groupId") String groupId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }
 

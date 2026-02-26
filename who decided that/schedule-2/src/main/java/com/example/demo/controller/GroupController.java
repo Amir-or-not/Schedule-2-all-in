@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -45,6 +46,7 @@ public class GroupController {
     }
     
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createGroup(@Valid @RequestBody Map<String, Object> request) {
         try {
             log.info("Received group creation request: {}", request);
@@ -94,6 +96,7 @@ public class GroupController {
     }
     
     @PutMapping("/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateGroup(
             @PathVariable("groupId") String groupId,
             @RequestBody Map<String, Object> request) {
@@ -152,6 +155,7 @@ public class GroupController {
     }
     
     @DeleteMapping("/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteGroup(@PathVariable("groupId") String groupId) {
         try {
             log.info("Deleting group with ID: {}", groupId);

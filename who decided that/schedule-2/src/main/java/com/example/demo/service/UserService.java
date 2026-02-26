@@ -4,17 +4,18 @@ import com.example.demo.dto.UserDTO;
 import com.example.demo.entity.User;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.GroupRepository;
+import com.example.demo.security.services.UserDetailsImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 public class UserService {
@@ -77,6 +78,7 @@ public class UserService {
         
         User user = convertToEntity(userDTO);
         User savedUser = userRepository.save(user);
+        log.info("[DATA] User created: userId={}, email={}", savedUser.getUserId(), savedUser.getEmail());
         return convertToDTO(savedUser);
     }
     
@@ -100,7 +102,9 @@ public class UserService {
             }
             
             if (userDTO.getRole() != null) {
-                existingUser.setRole(userDTO.getRole());
+                String cleanRole = userDTO.getRole().trim().toUpperCase();
+                if (cleanRole.startsWith("ROLE_")) cleanRole = cleanRole.substring(5);
+                existingUser.setRole(cleanRole);
             }
             
             if (userDTO.getGroupId() != null) {
@@ -121,19 +125,65 @@ public class UserService {
                 existingUser.setAvatar(userDTO.getAvatar());
             }
             
-            // Update password if provided
+            if (userDTO.getSubject() != null) {
+                existingUser.setSubject(userDTO.getSubject());
+            }
+
             if (userDTO.getPassword() != null && !userDTO.getPassword().isEmpty()) {
                 existingUser.setPassword(passwordEncoder.encode(userDTO.getPassword()));
             }
             
             User updatedUser = userRepository.save(existingUser);
+            log.info("[DATA] User updated: userId={}", userId);
             return convertToDTO(updatedUser);
         });
     }
     
+    /**
+     * Частичное обновление пользователя (роль, группа, имя, email) без смены пароля.
+     * Обновляются только переданные непустые поля.
+     */
+    public Optional<UserDTO> updateUserPartial(String userId, String fullName, String email, String groupId, String role, String subject) {
+        return userRepository.findById(userId).map(existingUser -> {
+            if (fullName != null && !fullName.isBlank()) {
+                existingUser.setFullName(fullName.trim());
+            }
+            if (email != null && !email.isBlank()) {
+                if (userRepository.existsByEmail(email) && !email.equals(existingUser.getEmail())) {
+                    throw new IllegalArgumentException("User with email " + email + " already exists");
+                }
+                existingUser.setEmail(email.trim());
+            }
+            if (groupId != null) {
+                if (!groupId.isBlank() && !groupRepository.existsById(groupId)) {
+                    throw new IllegalArgumentException("Group with ID " + groupId + " does not exist");
+                }
+                existingUser.setGroupId(groupId.isBlank() ? null : groupId.trim());
+            }
+            if (role != null && !role.isBlank()) {
+                String cleanRole = role.trim().toUpperCase();
+                if (cleanRole.startsWith("ROLE_")) cleanRole = cleanRole.substring(5);
+                existingUser.setRole(cleanRole);
+            }
+            if (subject != null) {
+                existingUser.setSubject(subject.isBlank() ? null : subject.trim());
+            }
+            if ((existingUser.getSubject() == null || existingUser.getSubject().isBlank())
+                    && existingUser.getRole() != null && existingUser.getRole().contains("TEACHER")
+                    && !"TEACHER".equals(existingUser.getRole())) {
+                String derived = UserDetailsImpl.resolveSubjectFromRole(existingUser.getRole());
+                if (derived != null) existingUser.setSubject(derived);
+            }
+            User updated = userRepository.save(existingUser);
+            log.info("[DATA] User updated (partial): userId={}, role={}, subject={}", userId, role, subject);
+            return convertToDTO(updated);
+        });
+    }
+
     public boolean deleteUser(String userId) {
         if (userRepository.existsById(userId)) {
             userRepository.deleteById(userId);
+            log.info("[DATA] User deleted: userId={}", userId);
             return true;
         }
         return false;
@@ -149,11 +199,13 @@ public class UserService {
         UserDTO userDTO = new UserDTO(
                 user.getUserId(),
                 user.getFullName(),
-                "", // Don't return password in DTO
+                "",
                 user.getEmail(),
                 user.getGroupId(),
                 user.getRole()
         );
+        userDTO.setSubject(user.getSubject());
+        userDTO.setCreatedAt(user.getCreatedAt());
         userDTO.setPersonalPermissions(user.getPersonalPermissions());
         userDTO.setAvatar(user.getAvatar());
         return userDTO;
@@ -168,6 +220,7 @@ public class UserService {
                 userDTO.getGroupId(),
                 userDTO.getRole()
         );
+        user.setSubject(userDTO.getSubject());
         user.setPersonalPermissions(userDTO.getPersonalPermissions());
         user.setAvatar(userDTO.getAvatar());
         return user;

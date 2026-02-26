@@ -1,8 +1,11 @@
 package com.example.demo.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+
+import java.time.LocalDateTime;
 
 public class UserDTO {
     
@@ -26,6 +29,12 @@ public class UserDTO {
     
     @Size(max = 20, message = "Role must not exceed 20 characters")
     private String role;
+
+    @Size(max = 100, message = "Subject must not exceed 100 characters")
+    private String subject;
+    
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime createdAt;
     
     private String personalPermissions;
     
@@ -91,6 +100,22 @@ public class UserDTO {
     
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public void setSubject(String subject) {
+        this.subject = subject;
+    }
+    
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+    
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
     
     public String getPersonalPermissions() {

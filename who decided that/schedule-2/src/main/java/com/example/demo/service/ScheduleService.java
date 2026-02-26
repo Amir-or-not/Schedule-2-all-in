@@ -61,6 +61,13 @@ public class ScheduleService {
                 .collect(Collectors.toList());
     }
 
+    /** Расписание группы на указанный день недели (для журнала учителя). */
+    public List<ScheduleDTO> getScheduleByGroupIdAndDayOfWeek(String groupId, String dayOfWeek) {
+        return scheduleRepository.findByGroupIdAndDayOfWeek(groupId, dayOfWeek).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
     public List<ScheduleDTO> getAllSchedules() {
         return scheduleRepository.findAll().stream()
                 .map(this::convertToDTO)
@@ -229,6 +236,7 @@ public class ScheduleService {
             throw new ResourceNotFoundException("Schedule not found with id: " + id);
         }
         scheduleRepository.deleteById(id);
+        log.info("[DATA] Schedule deleted: id={}", id);
         return true;
     }
     
@@ -318,9 +326,53 @@ public class ScheduleService {
         }
         
         Schedule updatedSchedule = scheduleRepository.save(schedule);
+        log.info("[DATA] Schedule updated: id={}", id);
         return convertToDTO(updatedSchedule);
     }
     
+    /**
+     * Автозаполнение расписания для всех групп: по каждому дню недели (ПН–ПТ) создаётся набор уроков.
+     * Если у группы уже есть расписание — группа пропускается.
+     */
+    @Transactional
+    public int seedScheduleForAllGroups() {
+        List<Group> groups = groupRepository.findAll();
+        if (groups.isEmpty()) {
+            log.info("[SEED] No groups found, nothing to seed");
+            return 0;
+        }
+        String[] days = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"};
+        String[] subjects = {"Математика", "Русский язык", "Физика", "История", "Информатика"};
+        int created = 0;
+        for (Group g : groups) {
+            String groupId = g.getGroupId();
+            if (groupId == null || groupId.trim().isEmpty()) continue;
+            List<Schedule> existing = scheduleRepository.findByGroupId(groupId);
+            if (!existing.isEmpty()) {
+                log.debug("[SEED] Group {} already has {} schedule entries, skip", groupId, existing.size());
+                continue;
+            }
+            for (String day : days) {
+                for (int i = 0; i < subjects.length; i++) {
+                    Schedule s = new Schedule();
+                    s.setScheduleId(UUID.randomUUID().toString());
+                    s.setScheduleName(groupId + "_" + day + "_" + i);
+                    s.setGroupId(groupId);
+                    s.setDayOfWeek(day);
+                    s.setSubject(subjects[i]);
+                    s.setStartTime(LocalTime.of(9 + i, 0));
+                    s.setEndTime(LocalTime.of(9 + i, 45));
+                    s.setTeacher(null);
+                    scheduleRepository.save(s);
+                    created++;
+                }
+            }
+            log.info("[SEED] Created {} schedule entries for group {}", subjects.length * days.length, groupId);
+        }
+        log.info("[SEED] Total schedule entries created: {}", created);
+        return created;
+    }
+
     private ScheduleDTO convertToDTO(Schedule schedule) {
         if (schedule == null) {
             return null;

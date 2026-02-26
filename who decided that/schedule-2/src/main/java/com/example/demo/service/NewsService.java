@@ -14,11 +14,13 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NewsService {
@@ -88,6 +90,7 @@ public class NewsService {
         news.setAuthor(author);
         
         News savedNews = newsRepository.save(news);
+        log.info("[DATA] News created: id={}, title={}, authorId={}", savedNews.getId(), savedNews.getTitle(), savedNews.getAuthor().getUserId());
         return convertToDTO(savedNews);
     }
 
@@ -118,6 +121,7 @@ public class NewsService {
         }
         
         News updatedNews = newsRepository.save(existingNews);
+        log.info("[DATA] News updated: id={}", id);
         return convertToDTO(updatedNews);
     }
 
@@ -135,6 +139,7 @@ public class NewsService {
         }
         
         newsRepository.deleteById(id);
+        log.info("[DATA] News deleted: id={}", id);
     }
 
     private NewsDTO convertToDTO(News news) {

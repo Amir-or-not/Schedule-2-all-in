@@ -1,10 +1,13 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.GroupDTO;
 import com.example.demo.dto.auth.JwtResponse;
 import com.example.demo.dto.auth.SignInRequest;
 import com.example.demo.dto.auth.SignUpRequest;
 import com.example.demo.entity.User;
+import com.example.demo.repository.GroupRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.service.GroupService;
 import com.example.demo.security.jwt.JwtUtils;
 import com.example.demo.security.services.UserDetailsImpl;
 import io.jsonwebtoken.Jwts;
@@ -20,11 +23,13 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.Date;
 import java.util.List;
+import java.util.Date;
 import java.util.stream.Collectors;
 
+@Slf4j
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/auth")
@@ -40,6 +45,21 @@ public class AuthController {
 
     @Autowired
     JwtUtils jwtUtils;
+
+    @Autowired
+    GroupRepository groupRepository;
+
+    @Autowired
+    GroupService groupService;
+
+    /**
+     * Список групп для выбора при регистрации (доступен без авторизации).
+     */
+    @GetMapping("/groups")
+    public ResponseEntity<List<GroupDTO>> getGroupsForRegistration() {
+        List<GroupDTO> groups = groupService.getAllGroups();
+        return ResponseEntity.ok(groups);
+    }
 
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody SignInRequest loginRequest) {
@@ -57,9 +77,7 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-            // Log user details for debugging
-            System.out.println("User authenticated: " + userDetails.getUsername());
-            System.out.println("User authorities: " + userDetails.getAuthorities());
+            log.info("[AUTH] signin success: user={}, authorities={}", userDetails.getUsername(), userDetails.getAuthorities());
 
             // Generate JWT token with roles
             String roles = userDetails.getAuthorities().stream()
@@ -76,42 +94,66 @@ public class AuthController {
                          SignatureAlgorithm.HS256)
                 .compact();
 
-            // Log the generated JWT for debugging
-            System.out.println("Generated JWT: " + jwt);
-            
-            // Decode and log the JWT payload for verification
-            String[] chunks = jwt.split("\\.");
-            if (chunks.length > 1) {
-                String payload = new String(java.util.Base64.getUrlDecoder().decode(chunks[1]));
-                System.out.println("JWT Payload: " + payload);
-            }
+            String fullName = userDetails.getFullName();
+            String groupId = userDetails.getGroupId();
+            String createdAt = null;
+            String subject = userDetails.getSubject();
+            try {
+                User dbUser = userRepository.findByEmail(userDetails.getEmail()).orElse(null);
+                if (dbUser != null) {
+                    if (dbUser.getFullName() != null) fullName = dbUser.getFullName();
+                    groupId = dbUser.getGroupId();
+                    if (dbUser.getSubject() != null && !dbUser.getSubject().isBlank()) {
+                        subject = dbUser.getSubject();
+                    }
+                    if (dbUser.getCreatedAt() != null) {
+                        createdAt = dbUser.getCreatedAt().toString();
+                    }
+                }
+            } catch (Exception ignored) {}
 
             return ResponseEntity.ok(new JwtResponse(
                     jwt,
                     userDetails.getId(),
-                    userDetails.getUsername(),
+                    fullName,
                     userDetails.getEmail(),
-                    roles
+                    roles,
+                    fullName,
+                    groupId,
+                    createdAt,
+                    subject
             ));
         } catch (Exception e) {
-            System.err.println("Authentication error: " + e.getMessage());
-            e.printStackTrace();
+            log.warn("[AUTH] signin failed: usernameOrEmail={}, error={}", loginRequest.getUsername(), e.getMessage());
             return ResponseEntity.status(401).body("Authentication failed: " + e.getMessage());
         }
     }
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignUpRequest signUpRequest) {
-        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+        String email = signUpRequest.getEmail();
+        boolean emailExists = userRepository.existsByEmail(email);
+        log.info("[AUTH] signup request: email={}, existsByEmail={}, username={}, fullName={}", email, emailExists, signUpRequest.getUsername(), signUpRequest.getFullName());
+        if (emailExists) {
             return ResponseEntity
                     .badRequest()
                     .body("Error: Email is already in use!");
         }
 
-        // Ensure group exists, if not use default user-group
+        // Нормализация и проверка группы: при пустом значении подставляем user-group
         String groupId = signUpRequest.getGroupId();
-        if (groupId == null || groupId.trim().isEmpty()) {
+        if (groupId == null || groupId.trim().isEmpty() || "default-group".equals(groupId)) {
             groupId = "user-group";
+        } else {
+            groupId = groupId.trim();
+        }
+
+        // Проверка существования группы в БД — без неё не создаём пользователя
+        if (!groupRepository.existsById(groupId)) {
+            log.warn("[AUTH] signup rejected: group not found, groupId={}", groupId);
+            return ResponseEntity
+                    .badRequest()
+                    .body("Error: Group not found. Please choose a group from the list (use GET /api/auth/groups).");
         }
 
         // Create new user's account
@@ -126,10 +168,10 @@ public class AuthController {
 
         try {
             userRepository.save(user);
+            log.info("[AUTH] signup success: email={}, groupId={}", signUpRequest.getEmail(), groupId);
             return ResponseEntity.ok("User registered successfully!");
         } catch (Exception e) {
-            System.err.println("Registration error: " + e.getMessage());
-            e.printStackTrace();
+            log.error("[AUTH] signup failed: email={}", signUpRequest.getEmail(), e);
             return ResponseEntity.status(500)
                     .body("Error: An unexpected error occurred: " + e.getMessage());
         }

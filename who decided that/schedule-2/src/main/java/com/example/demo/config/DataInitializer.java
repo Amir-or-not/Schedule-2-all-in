@@ -132,6 +132,28 @@ public class DataInitializer implements CommandLineRunner {
                 }
             }
         }
+
+        // Ensure demo teacher exists (password: admin123, subject: Математика)
+        String teacherId = "teacher";
+        String teacherEmail = "teacher@example.com";
+        String teacherPassword = "admin123";
+        User existingTeacher = userRepository.findByUserId(teacherId).orElse(null);
+        if (existingTeacher == null) {
+            User teacher = new User();
+            teacher.setUserId(teacherId);
+            teacher.setEmail(teacherEmail);
+            teacher.setFullName("Teacher User");
+            teacher.setPassword(passwordEncoder.encode(teacherPassword));
+            teacher.setRole("TEACHER");
+            teacher.setGroupId("user-group");
+            teacher.setSubject("Математика");
+            userRepository.save(teacher);
+            log.info("Demo teacher created - Email: {}, Password: {}, Subject: Математика", teacherEmail, teacherPassword);
+        } else if (existingTeacher.getSubject() == null || existingTeacher.getSubject().isBlank()) {
+            existingTeacher.setSubject("Математика");
+            userRepository.save(existingTeacher);
+            log.info("Updated demo teacher with subject: Математика");
+        }
         
         // Log all users for debugging
         List<User> allUsers = userRepository.findAll();
@@ -197,6 +219,20 @@ public class DataInitializer implements CommandLineRunner {
             userGroup.setData(userData);
             groupRepository.save(userGroup);
             log.info("Created user group: {}", userGroupId);
+        }
+
+        // Create default-group if it doesn't exist (used by schedule and some clients on signup)
+        String defaultGroupId = "default-group";
+        if (!groupRepository.existsById(defaultGroupId)) {
+            Group defaultGroup = new Group();
+            defaultGroup.setGroupId(defaultGroupId);
+            defaultGroup.setScheduleId(scheduleId);
+            defaultGroup.setGroupName("Default Group");
+            defaultGroup.setDescription("Default group for new users");
+            Map<String, Object> defaultData = new HashMap<>();
+            defaultGroup.setData(defaultData);
+            groupRepository.save(defaultGroup);
+            log.info("Created default group: {}", defaultGroupId);
         }
     }
 }
